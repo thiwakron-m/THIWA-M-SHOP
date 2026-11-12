@@ -1,134 +1,89 @@
 
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <base target="_top">
+<script>
+  const SHOP_URL =
+    "https://script.google.com/macros/s/AKfycbx81L5v7FxBH9tdrjDtNKpzut6cuJQTWQaiBtSrCpVjuZAcS183L5Xz6YIDKQFXbwcqWg/exec";
 
-  <link rel="icon" href="https://fav.farm/🍁">
-  <title>THIWA M SHOP - OLD SCHOOL MARKET</title>
+  async function checkCountry() {
+    const loading = document.getElementById("loading");
+    const blocked = document.getElementById("blocked");
+    const error = document.getElementById("error");
+    const shop = document.getElementById("shop");
 
-  <style>
-    * { box-sizing: border-box; }
+    loading.style.display = "flex";
+    blocked.style.display = "none";
+    error.style.display = "none";
+    shop.style.display = "none";
 
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: white;
-    }
+    try {
+      // ตรวจสอบประเทศจาก 2 API พร้อมกัน
+      const providers = [
+        async function () {
+          const response = await fetch("https://ipwho.is/", {
+            cache: "no-store"
+          });
 
-    #loading, #blocked, #error {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      padding: 24px;
-      background: #111;
-      z-index: 10;
-    }
+          if (!response.ok) throw new Error("ipwho error");
 
-    #blocked, #error, #shop {
-      display: none;
-    }
+          const data = await response.json();
 
-    h2 { margin-bottom: 12px; }
+          if (!data.success || !data.country_code) {
+            throw new Error("Invalid ipwho response");
+          }
 
-    p {
-      color: #bbb;
-      line-height: 1.6;
-    }
+          return data.country_code.toUpperCase();
+        },
 
-    button {
-      margin-top: 16px;
-      padding: 12px 28px;
-      border: 0;
-      border-radius: 8px;
-      background: #d69b32;
-      color: #111;
-      font-weight: bold;
-      cursor: pointer;
-    }
+        async function () {
+          const response = await fetch("https://ipapi.co/json/", {
+            cache: "no-store"
+          });
 
-    iframe {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border: 0;
-    }
-  </style>
-</head>
+          if (!response.ok) throw new Error("ipapi error");
 
-<body>
+          const data = await response.json();
 
-  <div id="loading">
-    <h2>🍁 THIWA M SHOP</h2>
-    <p>กำลังตรวจสอบพื้นที่การเข้าใช้งาน...</p>
-  </div>
+          if (!data.country_code) {
+            throw new Error("Invalid ipapi response");
+          }
 
-  <div id="blocked">
-    <h2>⛔ ไม่อนุญาตให้เข้าใช้งาน</h2>
-    <p>เว็บไซต์นี้เปิดให้บริการเฉพาะผู้ใช้งานจากประเทศไทยเท่านั้น</p>
-  </div>
-
-  <div id="error">
-    <h2>⚠️ ไม่สามารถตรวจสอบประเทศได้</h2>
-    <p>กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง</p>
-    <button onclick="checkCountry()">ลองอีกครั้ง</button>
-  </div>
-
-  <div id="shop"></div>
-
-  <script>
-    const SHOP_URL =
-      "https://script.google.com/macros/s/AKfycbx81L5v7FxBH9tdrjDtNKpzut6cuJQTWQaiBtSrCpVjuZAcS183L5Xz6YIDKQFXbwcqWg/exec";
-
-    async function checkCountry() {
-      document.getElementById("loading").style.display = "flex";
-      document.getElementById("blocked").style.display = "none";
-      document.getElementById("error").style.display = "none";
-      document.getElementById("shop").style.display = "none";
-
-      try {
-        const response = await fetch("https://ipwho.is/", {
-          cache: "no-store"
-        });
-
-        if (!response.ok) throw new Error("API error");
-
-        const data = await response.json();
-
-        if (!data.success || !data.country_code) {
-          throw new Error("Country detection failed");
+          return data.country_code.toUpperCase();
         }
+      ];
 
-        document.getElementById("loading").style.display = "none";
+      // ใช้ API ตัวแรกที่ตรวจสอบสำเร็จ
+      const countryCode = await Promise.any(
+        providers.map(function (provider) {
+          return provider();
+        })
+      );
 
-        if (data.country_code === "TH") {
-          const iframe = document.createElement("iframe");
-          iframe.src = SHOP_URL;
-          iframe.setAttribute("frameborder", "0");
-
-          document.getElementById("shop").appendChild(iframe);
-          document.getElementById("shop").style.display = "block";
-        } else {
-          document.getElementById("blocked").style.display = "flex";
-        }
-
-      } catch (error) {
-        document.getElementById("loading").style.display = "none";
-        document.getElementById("error").style.display = "flex";
+      if (countryCode !== "TH") {
+        loading.style.display = "none";
+        blocked.style.display = "flex";
+        return;
       }
+
+      // เริ่มโหลดร้านค้า
+      const iframe = document.createElement("iframe");
+
+      iframe.src = SHOP_URL;
+      iframe.setAttribute("frameborder", "0");
+
+      iframe.onload = function () {
+        loading.style.display = "none";
+      };
+
+      shop.innerHTML = "";
+      shop.appendChild(iframe);
+      shop.style.display = "block";
+
+    } catch (err) {
+      console.error("Country Check Error:", err);
+
+      loading.style.display = "none";
+      error.style.display = "flex";
     }
+  }
 
-    checkCountry();
-  </script>
-
-</body>
-</html>
+  checkCountry();
+</script>
